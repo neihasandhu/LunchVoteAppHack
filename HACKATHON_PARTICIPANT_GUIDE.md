@@ -687,6 +687,36 @@ When a command fails:
 | ✅ 9 | **End-to-end works** | You can open the deployed Frontend URL in a browser, see the home page, navigate to a group, and see poll data (from the in-memory database) |
 | ✅ 10 | **GitHub Copilot** | Used GitHub Copilot to assist with deployment commands, troubleshoot errors, or understand Azure CLI syntax |
 
+
+### Prerequisites: Set Up Terraform Backend Storage
+
+Terraform stores its state in an Azure Storage account. Before running `terraform init`, you need to create this backend infrastructure:
+
+```powershell
+# 1. Create resource group for Terraform state (Australia East region)
+az group create --name rg-terraform-state --location australiaeast
+
+# 2. Create storage account for state files
+az storage account create `
+  --name sttfstatelunchvote `
+  --resource-group rg-terraform-state `
+  --location australiaeast `
+  --sku Standard_LRS
+
+# 3. Create blob container to hold the state file
+az storage container create `
+  --name tfstate `
+  --account-name sttfstatelunchvote
+```
+
+> **Note:** This is a one-time setup. The backend configuration in `versions.tf` references these resources:
+> - Resource Group: `rg-terraform-state`
+> - Storage Account: `sttfstatelunchvote`
+> - Container: `tfstate`
+> - State File: `lunchvote-dev.tfstate`
+
+> 💡 **Why?** Storing Terraform state remotely enables team collaboration, state locking to prevent conflicts, and keeps sensitive data out of version control.
+
 ### Deployment Commands Cheat Sheet
 
 > 💡 Use GitHub Copilot to help you fill in the blanks and troubleshoot any issues.
@@ -696,9 +726,9 @@ When a command fails:
 $OBJECT_ID = az ad signed-in-user show --query id -o tsv
 $EMAIL = az ad signed-in-user show --query userPrincipalName -o tsv
 
-# 2. Provision infrastructure
+# 2. Provision infrastructure (after completing backend setup above)
 cd infra/my-terraform
-terraform init
+terraform init  # Will now connect to the remote backend in Azure
 terraform plan -out tfplan -var="sql_admin_object_id=$OBJECT_ID" -var="sql_admin_login=$EMAIL"
 terraform apply tfplan
 
