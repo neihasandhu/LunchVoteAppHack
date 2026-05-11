@@ -1,8 +1,9 @@
 -- SQL script to create managed identity user for App Service
 -- Run this after deploying infrastructure
 
--- Replace 'app-lunchvote-api-dev' with your actual App Service name
-DECLARE @appServiceName NVARCHAR(100) = 'app-lunchvote-api-dev';
+-- Replace with your actual App Service name (including the random suffix from Terraform)
+-- Run: terraform output app_service_name   to get the actual name (e.g., app-lunchvote-api-dev-a1b2c3)
+DECLARE @appServiceName NVARCHAR(100) = 'app-lunchvote-api-dev-CHANGE_ME';
 
 -- Create user from external provider (Managed Identity)
 -- Note: You must be connected as the Microsoft Entra admin to run this
