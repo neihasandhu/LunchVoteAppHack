@@ -12,5 +12,6 @@ terraform {
     storage_account_name = "sttfstatelunchvote"
     container_name       = "tfstate"
     key                  = "lunchvote-dev.tfstate"
+    use_azuread_auth     = true
   }
 }
