@@ -270,9 +270,9 @@ terraform output
 - **Shared** App Service Plan: `plan-lunchvote-dev-{random}` (Linux, **F1 Free** SKU)
 - Backend App Service: `app-lunchvote-api-dev-{random}` (.NET 8.0)
 - Frontend App Service: `app-lunchvote-spa-dev-{random}` (Node.js 20 LTS) — same plan as API
-- SQL Server: `sql-lunchvote-dev` (Entra ID auth only)
-- SQL Database: `sqldb-lunchvote` (Basic tier, 2GB)
-- Key Vault: `kv-lunchvote-dev` (RBAC enabled)
+- SQL Server: `sql-lunchvote-dev-{random}` (Entra ID auth only)
+- SQL Database: `sqldb-lunchvote-{random}` (Basic tier, 2GB)
+- Key Vault: `kv-lunchvote-dev-{random}` (RBAC enabled)
 - Static Web App: `stapp-lunchvote-dev` (optional, disabled by default)
 
 **Note:** The Terraform Azure App Service provider currently supports .NET 8.0 as the runtime. While the application code is built with .NET 10.0, it runs on the .NET 8.0 runtime in Azure. For full .NET 10.0 runtime support, use the Bicep deployment option instead.
@@ -436,6 +436,47 @@ az webapp restart --resource-group rg-lunchvote-dev --name app-lunchvote-spa-dev
 ```
 
 > **Why two CORS configurations?** Azure App Service has platform-level CORS that runs before your app code. The .NET API also has its own CORS middleware configured via the `AllowedOrigins` setting in `appsettings.json`. Both must include the frontend origin for cross-origin requests to succeed.
+
+### Create SQL Database User
+
+Terraform automatically configures the `DefaultConnection` connection string on the backend App Service, but the App Service's **Managed Identity** must be manually granted access to the SQL Database. Without this step, the API will return 500 errors when trying to query the database.
+
+1. **Get your App Service name** from Terraform output:
+
+```powershell
+cd infra/terraform
+terraform output app_service_name
+# e.g., app-lunchvote-api-dev-a1b2c3
+```
+
+2. **Connect to the SQL Database** using Azure CLI authentication:
+
+```powershell
+# Get SQL details from Terraform
+$SQL_SERVER = terraform output -raw sql_server_name
+$SQL_DB = terraform output -raw sql_database_name
+
+# Open a query editor in the Azure Portal, or use sqlcmd/Azure Data Studio
+# You must be connected as the Entra ID admin configured during terraform apply
+```
+
+3. **Run the SQL script** (replace `<app-service-name>` with your actual name from step 1):
+
+```sql
+CREATE USER [<app-service-name>] FROM EXTERNAL PROVIDER;
+ALTER ROLE db_datareader ADD MEMBER [<app-service-name>];
+ALTER ROLE db_datawriter ADD MEMBER [<app-service-name>];
+```
+
+A helper script is also available at `infra/scripts/create-sql-user.sql` — update the `@appServiceName` variable with your actual App Service name (including the random suffix).
+
+4. **Restart the API** to apply the connection:
+
+```powershell
+az webapp restart --resource-group rg-lunchvote-dev --name <app-service-name>
+```
+
+The API will now use Azure SQL Database instead of the in-memory database. EF Core will auto-create the schema tables (`Poll`, `Option`, `Vote`) on startup.
 
 ## Infrastructure Features
 
