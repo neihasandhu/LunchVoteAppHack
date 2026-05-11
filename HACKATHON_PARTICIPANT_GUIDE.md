@@ -370,7 +370,7 @@ infra/
 
 | # | Criteria | Details |
 |---|----------|---------|
-| ✅ 1 | **Provider configuration** | Terraform `azurerm` provider ~> 3.0 is configured with required features block |
+| ✅ 1 | **Provider configuration** | Terraform `azurerm` provider ~> 4.0 is configured with required features block |
 | ✅ 2 | **Resource Group** | An Azure Resource Group is created with naming convention `rg-lunchvote-{environment}` |
 | ✅ 3 | **Backend App Service** | A Linux App Service Plan (B1 SKU) and App Service with .NET 8.0 runtime, `SystemAssigned` managed identity, HTTPS-only, TLS 1.2+, and CORS configured for `http://localhost:5173` |
 | ✅ 4 | **Frontend App Service** | A separate Linux App Service Plan (B1 SKU) and App Service with Node.js 20 LTS runtime, `SystemAssigned` managed identity, HTTPS-only, TLS 1.2+ |
@@ -404,7 +404,7 @@ You are an expert Terraform engineer specializing in Azure cloud infrastructure.
 
 ## Rules
 - Always use modular Terraform structure with separate modules per resource type
-- Use azurerm provider ~> 3.0
+- Use azurerm provider ~> 4.0
 - Include variable validation rules for environment (dev/stg/prod)
 - Enable managed identity (SystemAssigned) on all App Services
 - Use RBAC authorization for Key Vault (never access policies)
