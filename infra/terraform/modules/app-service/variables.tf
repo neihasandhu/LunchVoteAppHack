@@ -43,3 +43,9 @@ variable "frontend_url" {
   type        = string
   default     = ""
 }
+
+variable "suffix" {
+  description = "Random suffix for resource naming"
+  type        = string
+}
+

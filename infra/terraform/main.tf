@@ -1,5 +1,10 @@
 # Main orchestration for Lunch Vote App infrastructure
 # Deploys App Service, SQL Database, Key Vault, and Static Web App
+resource "random_string" "common_suffix" {
+  length  = 6
+  special = false
+  upper   = false
+}
 
 # Data source for current Azure configuration
 data "azurerm_client_config" "current" {}
@@ -42,6 +47,8 @@ module "app_service" {
   sql_database_name     = module.sql_database.database_name
   key_vault_uri         = module.key_vault.key_vault_uri
   env                   = var.env
+  frontend_url          = "https://app-lunchvote-spa-${var.env}-${random_string.common_suffix.result}.azurewebsites.net"
+  suffix                = random_string.common_suffix.result
 }
 
 # Frontend App Service Module (shares the API App Service Plan)

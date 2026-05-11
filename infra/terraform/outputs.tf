@@ -62,3 +62,7 @@ output "static_web_app_default_hostname" {
   description = "Default hostname of the Static Web App"
   value       = var.deploy_static_web_app ? module.static_web_app[0].default_hostname : ""
 }
+output "resource_group_name" {
+  description = "Name of the resource group"
+  value       = azurerm_resource_group.main.name
+}

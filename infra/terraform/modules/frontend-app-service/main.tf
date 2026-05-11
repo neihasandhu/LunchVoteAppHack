@@ -2,6 +2,7 @@
 # Creates App Service for the React/Vite SPA
 # Uses the shared App Service Plan created by the API module
 
+
 resource "random_string" "suffix" {
   length  = 6
   special = false
@@ -20,6 +21,7 @@ resource "azurerm_linux_web_app" "frontend" {
   }
 
   site_config {
+    always_on           = false
     ftps_state          = "Disabled"
     minimum_tls_version = "1.2"
     http2_enabled       = true

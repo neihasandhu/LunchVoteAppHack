@@ -1,21 +1,17 @@
 # App Service Module
 # Creates App Service Plan and App Service for the .NET 10 API
 
-resource "random_string" "suffix" {
-  length  = 6
-  special = false
-  upper   = false
-}
+
 resource "azurerm_service_plan" "main" {
-  name                = "${var.app_service_plan_name}-${random_string.suffix.result}"
+  name                = "${var.app_service_plan_name}-${var.suffix}"
   location            = var.location
   resource_group_name = var.resource_group_name
   os_type             = "Linux"
-  sku_name            = "F1"
+  sku_name            = "B1"
 }
 
 resource "azurerm_linux_web_app" "main" {
-  name                = "app-lunchvote-api-${var.env}-${random_string.suffix.result}"
+  name                = "app-lunchvote-api-${var.env}-${var.suffix}"
   location            = var.location
   resource_group_name = var.resource_group_name
   service_plan_id     = azurerm_service_plan.main.id
@@ -26,6 +22,7 @@ resource "azurerm_linux_web_app" "main" {
   }
 
   site_config {
+    always_on           = false
     ftps_state          = "Disabled"
     http2_enabled       = true
     minimum_tls_version = "1.2"
