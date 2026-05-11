@@ -18,6 +18,11 @@ output "app_service_principal_id" {
   value       = module.app_service.principal_id
 }
 
+output "service_plan_name" {
+  description = "Name of the shared App Service Plan (API + SPA)"
+  value       = module.app_service.service_plan_name
+}
+
 output "frontend_app_service_name" {
   description = "Name of the Frontend App Service"
   value       = module.frontend_app_service.app_service_name

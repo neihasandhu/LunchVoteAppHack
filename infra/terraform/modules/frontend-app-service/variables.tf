@@ -8,8 +8,8 @@ variable "resource_group_name" {
   type        = string
 }
 
-variable "app_service_plan_name" {
-  description = "Name of the App Service Plan for frontend"
+variable "service_plan_id" {
+  description = "ID of the shared App Service Plan (created by the API module)"
   type        = string
 }
 

@@ -44,14 +44,14 @@ module "app_service" {
   env                   = var.env
 }
 
-# Frontend App Service Module
+# Frontend App Service Module (shares the API App Service Plan)
 module "frontend_app_service" {
   source = "./modules/frontend-app-service"
-  location              = azurerm_resource_group.main.location
-  resource_group_name   = azurerm_resource_group.main.name
-  app_service_plan_name = "plan-${var.name}-frontend-${var.env}"
-  api_base_url          = "https://${module.app_service.default_hostname}"
-  environment           = var.env
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  service_plan_id     = module.app_service.service_plan_id
+  api_base_url        = "https://${module.app_service.default_hostname}"
+  environment         = var.env
 }
 
 # Key Vault Access Module

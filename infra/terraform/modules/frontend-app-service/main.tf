@@ -1,5 +1,6 @@
 # Frontend App Service Module
 # Creates App Service for the React/Vite SPA
+# Uses the shared App Service Plan created by the API module
 
 resource "random_string" "suffix" {
   length  = 6
@@ -7,19 +8,11 @@ resource "random_string" "suffix" {
   upper   = false
 }
 
-resource "azurerm_service_plan" "frontend" {
-  name                = "${var.app_service_plan_name}-${random_string.suffix.result}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  os_type             = "Linux"
-  sku_name            = "B1"
-}
-
 resource "azurerm_linux_web_app" "frontend" {
   name                = "app-lunchvote-spa-${var.environment}-${random_string.suffix.result}"
   location            = var.location
   resource_group_name = var.resource_group_name
-  service_plan_id     = azurerm_service_plan.frontend.id
+  service_plan_id     = var.service_plan_id
   https_only          = true
 
   identity {
@@ -27,7 +20,6 @@ resource "azurerm_linux_web_app" "frontend" {
   }
 
   site_config {
-    always_on           = true
     ftps_state          = "Disabled"
     minimum_tls_version = "1.2"
     http2_enabled       = true

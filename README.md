@@ -6,6 +6,10 @@ A team-based lunch voting application that enables groups within an organization
 
 ```
 LunchVoteApp/
+├── .github/
+│   └── instructions/          # GitHub Copilot instruction files
+│       ├── module_generation_azure.instructions.md
+│       └── terraform_coding_standards_azure.instructions.md
 ├── src/
 │   ├── LunchVoteApi/          # .NET 10 Web API
 │   └── lunch-vote-spa/        # React + Vite + TypeScript SPA
@@ -16,6 +20,8 @@ LunchVoteApp/
 │   └── terraform/             # Terraform IaC templates
 └── LunchVoteApp.sln           # Visual Studio solution file
 ```
+
+> **GitHub Copilot Instructions:** The `.github/instructions/` folder contains Terraform coding standards and module generation guidelines. GitHub Copilot automatically follows these instruction files when generating or editing Terraform code in this workspace.
 
 ## Technology Stack
 
@@ -261,13 +267,12 @@ terraform output
 #### Terraform Resources Created
 
 - Resource Group: `rg-lunchvote-dev`
-- Backend App Service Plan: `plan-lunchvote-dev` (Linux, B1 SKU)
+- **Shared** App Service Plan: `plan-lunchvote-dev-{random}` (Linux, **F1 Free** SKU)
 - Backend App Service: `app-lunchvote-api-dev-{random}` (.NET 8.0)
-- Frontend App Service Plan: `plan-lunchvote-spa-dev` (Linux, B1 SKU)
-- Frontend App Service: `app-lunchvote-spa-dev-{random}` (Node.js 20 LTS)
-- SQL Server: `sql-lunchvote-dev` (Entra ID auth only)
-- SQL Database: `sqldb-lunchvote` (Basic tier, 2GB)
-- Key Vault: `kv-lunchvote-dev` (RBAC enabled)
+- Frontend App Service: `app-lunchvote-spa-dev-{random}` (Node.js 20 LTS) — same plan as API
+- SQL Server: `sql-lunchvote-dev-{random}` (Entra ID auth only)
+- SQL Database: `sqldb-lunchvote-{random}` (Basic tier, 2GB)
+- Key Vault: `kv-lunchvote-dev-{random}` (RBAC enabled)
 - Static Web App: `stapp-lunchvote-dev` (optional, disabled by default)
 
 **Note:** The Terraform Azure App Service provider currently supports .NET 8.0 as the runtime. While the application code is built with .NET 10.0, it runs on the .NET 8.0 runtime in Azure. For full .NET 10.0 runtime support, use the Bicep deployment option instead.
@@ -292,11 +297,14 @@ terraform apply \
 
 The deployment process uses zip deployment to Azure App Service.
 
-```bash
+```powershell
 cd src/LunchVoteApi
 
 # Build and publish the application
 dotnet publish -c Release -o ./publish
+
+# Remove BuildHost-netcore folder (contains Windows backslash paths that fail on Linux)
+Remove-Item -Recurse -Force ./publish/BuildHost-netcore -ErrorAction SilentlyContinue
 
 # Create a zip archive from the published output
 Compress-Archive -Path ./publish/* -DestinationPath ./publish.zip -Force
@@ -304,23 +312,40 @@ Compress-Archive -Path ./publish/* -DestinationPath ./publish.zip -Force
 # Deploy the zip archive to Azure App Service
 az webapp deploy \
   --resource-group rg-lunchvote-dev \
-  --name app-lunchvote-api-dev \
+  --name app-lunchvote-api-dev-{random-suffix} \
   --src-path ./publish.zip \
   --type zip
 
 # Clean up
 Remove-Item ./publish.zip
+Remove-Item -Recurse -Force ./publish
 ```
 
-**Note:** The `az webapp deploy` command with `--type zip` performs a zip deployment. 
+**Note:** Replace `{random-suffix}` with the actual suffix from your Terraform deployment output. The `BuildHost-netcore` removal is required when publishing on Windows for a Linux App Service (see Appendix in the Hackathon Guide for details).
 
 ### Deploy Frontend
 
-```bash
+```powershell
 cd src/lunch-vote-spa
+npm install
+
+# Set the API URL (required - Vite embeds this at build time)
+$env:VITE_API_URL = "https://app-lunchvote-api-dev-{random-suffix}.azurewebsites.net/api"
 npm run build
 
-# Deploy to Frontend App Service
+# Disable remote build (we're deploying pre-built static files)
+az webapp config appsettings set \
+  --resource-group rg-lunchvote-dev \
+  --name app-lunchvote-spa-dev-{random-suffix} \
+  --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false
+
+# Configure pm2 to serve the static SPA with client-side routing
+az webapp config set \
+  --resource-group rg-lunchvote-dev \
+  --name app-lunchvote-spa-dev-{random-suffix} \
+  --startup-file "pm2 serve /home/site/wwwroot --no-daemon --spa"
+
+# Zip and deploy
 Compress-Archive -Path ./dist/* -DestinationPath ./dist.zip -Force
 
 az webapp deploy \
@@ -335,6 +360,74 @@ Remove-Item ./dist.zip
 
 **Note:** Replace `{random-suffix}` with the actual suffix from your Terraform deployment output.
 
+### Configure CORS (API → Frontend)
+
+After deploying both the API and frontend, configure CORS so the SPA can call the API:
+
+```powershell
+# Azure-level CORS
+az webapp cors add \
+  --resource-group rg-lunchvote-dev \
+  --name app-lunchvote-api-dev-{random-suffix} \
+  --allowed-origins "https://app-lunchvote-spa-dev-{random-suffix}.azurewebsites.net"
+
+# .NET application-level CORS (AllowedOrigins config array)
+az webapp config appsettings set \
+  --resource-group rg-lunchvote-dev \
+  --name app-lunchvote-api-dev-{random-suffix} \
+  --settings \
+    AllowedOrigins__0="https://app-lunchvote-spa-dev-{random-suffix}.azurewebsites.net" \
+    AllowedOrigins__1="http://localhost:5173" \
+    AllowedOrigins__2="http://localhost:3000"
+
+# Restart both apps
+az webapp restart --resource-group rg-lunchvote-dev --name app-lunchvote-api-dev-{random-suffix}
+az webapp restart --resource-group rg-lunchvote-dev --name app-lunchvote-spa-dev-{random-suffix}
+```
+
+> **Why two CORS configurations?** Azure App Service has platform-level CORS that runs before your app code. The .NET API also has its own CORS middleware configured via the `AllowedOrigins` setting in `appsettings.json`. Both must include the frontend origin for cross-origin requests to succeed.
+
+### Create SQL Database User
+
+Terraform automatically configures the `DefaultConnection` connection string on the backend App Service, but the App Service's **Managed Identity** must be manually granted access to the SQL Database. Without this step, the API will return 500 errors when trying to query the database.
+
+1. **Get your App Service name** from Terraform output:
+
+```powershell
+cd infra/terraform
+terraform output app_service_name
+# e.g., app-lunchvote-api-dev-a1b2c3
+```
+
+2. **Connect to the SQL Database** using Azure CLI authentication:
+
+```powershell
+# Get SQL details from Terraform
+$SQL_SERVER = terraform output -raw sql_server_name
+$SQL_DB = terraform output -raw sql_database_name
+
+# Open a query editor in the Azure Portal, or use sqlcmd/Azure Data Studio
+# You must be connected as the Entra ID admin configured during terraform apply
+```
+
+3. **Run the SQL script** (replace `<app-service-name>` with your actual name from step 1):
+
+```sql
+CREATE USER [<app-service-name>] FROM EXTERNAL PROVIDER;
+ALTER ROLE db_datareader ADD MEMBER [<app-service-name>];
+ALTER ROLE db_datawriter ADD MEMBER [<app-service-name>];
+```
+
+A helper script is also available at `infra/scripts/create-sql-user.sql` — update the `@appServiceName` variable with your actual App Service name (including the random suffix).
+
+4. **Restart the API** to apply the connection:
+
+```powershell
+az webapp restart --resource-group rg-lunchvote-dev --name <app-service-name>
+```
+
+The API will now use Azure SQL Database instead of the in-memory database. EF Core will auto-create the schema tables (`Poll`, `Option`, `Vote`) on startup.
+
 ## Infrastructure Features
 
 Both Bicep and Terraform deployments include:
@@ -345,7 +438,7 @@ Both Bicep and Terraform deployments include:
 - ✅ **Security**: TLS 1.2+, HTTPS-only, soft delete enabled
 - ✅ **Environment Isolation**: Resources named with environment suffix (`-dev`, `-stg`, `-prod`)
 - ✅ **CORS Configuration**: Pre-configured for local development
-- ✅ **Dual App Service Architecture**: Separate App Services for Backend API and Frontend SPA
+- ✅ **Shared App Service Plan**: Single F1 Free plan for both Backend API and Frontend SPA (upgrade to S1 for deployment slots)
 
 ## Sample Usage
 
