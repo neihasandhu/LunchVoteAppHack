@@ -59,6 +59,7 @@ module "frontend_app_service" {
   service_plan_id     = module.app_service.service_plan_id
   api_base_url        = "https://${module.app_service.default_hostname}"
   environment         = var.env
+  suffix              = random_string.common_suffix.result
 }
 
 # Key Vault Access Module
@@ -76,3 +77,4 @@ module "static_web_app" {
   resource_group_name = azurerm_resource_group.main.name
   static_web_app_name = "stapp-${var.name}-${var.env}"
 }
+
