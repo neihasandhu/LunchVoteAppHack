@@ -40,6 +40,7 @@ This is a condensed version of the [full-day hackathon](HACKATHON_PARTICIPANT_GU
 We are using **GitHub Codespaces** to ensure everyone has a consistent, ready-to-go environment. A tailored `devcontainer.json` is already provided which includes all the prerequisite tools (Node 20, .NET 8, Terraform, Azure CLI) pre-installed!
 
 1. **Launch your Codespace:**
+   - Log in to GitHub using your already created **GitHubAlias**.
    - Navigate to the repository on GitHub.
    - Click the green **Code** button.
    - Select the **Codespaces** tab.
