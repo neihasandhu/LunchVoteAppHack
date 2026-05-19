@@ -84,8 +84,9 @@ if (app.Environment.IsDevelopment())
             dbContext.Database.EnsureCreated();
         }
     }
-    catch
+    catch (Exception ex)
     {
+        Console.WriteLine(ex.ToString());
         // Ignore if database creation fails (e.g., SQL Server not available)
     }
 }
@@ -104,3 +105,6 @@ app.Run();
 
 // Make Program class accessible for integration tests
 public partial class Program { }
+
+
+
