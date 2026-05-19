@@ -30,16 +30,6 @@ resource "azurerm_linux_web_app" "main" {
     application_stack {
       dotnet_version = "8.0"
     }
-
-    cors {
-      allowed_origins = compact([
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "https://*.azurestaticapps.net",
-        var.frontend_url
-      ])
-      support_credentials = false
-    }
   }
 
   app_settings = {

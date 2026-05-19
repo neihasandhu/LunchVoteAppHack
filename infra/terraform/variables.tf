@@ -6,10 +6,10 @@ variable "name" {
 variable "env" {
   description = "The environment descriptor into which resources created by this module will be provisioned"
   type        = string
-  default     = "nonprod"
+  default     = "dev"
   validation {
-    condition     = contains(["nonprod", "prod", "sandpit"], var.env)
-    error_message = "The env value must be one of 'nonprod', 'prod', or 'sandpit'"
+    condition     = contains(["dev", "stg", "prod"], var.env)
+    error_message = "The env value must be one of 'dev', 'stg', or 'prod'"
   }
 }
 

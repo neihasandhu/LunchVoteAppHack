@@ -50,7 +50,7 @@ terraform output
 Edit `terraform.tfvars` to customize your deployment:
 
 ```hcl
-environment             = "dev"
+env                     = "dev"
 location                = "australiaeast"
 sql_admin_object_id     = "your-object-id"
 sql_admin_login         = "your-email@domain.com"

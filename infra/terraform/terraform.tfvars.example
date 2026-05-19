@@ -2,7 +2,7 @@
 # Copy this file to terraform.tfvars and update with your values
 
 # Environment (dev, stg, prod)
-environment = "dev"
+env = "dev"
 
 # Azure region for all resources
 location = "australiaeast"

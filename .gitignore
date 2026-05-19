@@ -71,3 +71,14 @@ infra/bicep/**/*.parameters.*.json
 api-publish*/
 *.ps1
 *.sql
+
+# Local secrets / tokens
+token.txt
+*.token
+
+# Downloaded log bundles
+*-logs.zip
+*-logs-extracted/
+
+# SPA build env
+src/lunch-vote-spa/.env.production

@@ -153,15 +153,17 @@ If you choose the template path, the equivalent structure already exists in `inf
 
 ### Step 1: Terraform Backend + Apply
 
-```powershell
-# One-time: create state storage
+> ⚠️ **Tenant note:** Some hackathon tenants block both AAD-auth and shared-key auth to Storage. If `terraform init` with an `azurerm` backend fails with `AuthorizationPermissionMismatch` or `KeyBasedAuthenticationNotPermitted`, fall back to the **local backend** — change `versions.tf` to `backend "local" { path = "terraform.tfstate" }` and skip the storage account step entirely.
+
+```bash
+# (Optional) remote state — skip if your tenant blocks storage auth
 az group create --name rg-terraform-state --location australiaeast
 az storage account create --name sttfstatelunchvote --resource-group rg-terraform-state --location australiaeast --sku Standard_LRS
 az storage container create --name tfstate --account-name sttfstatelunchvote
 
 # Get your credentials
-$OBJECT_ID = az ad signed-in-user show --query id -o tsv
-$EMAIL = az ad signed-in-user show --query userPrincipalName -o tsv
+OBJECT_ID=$(az ad signed-in-user show --query id -o tsv)
+EMAIL=$(az ad signed-in-user show --query userPrincipalName -o tsv)
 
 # Provision
 cd <YOUR_TERRAFORM_DIR>
@@ -173,28 +175,48 @@ terraform output
 
 Use `infra/my-terraform` for the scratch path, or `infra/terraform` if you are using the provided templates directly.
 
+> ⚠️ **azurerm CORS bug:** Do **not** put a `cors {}` block inside the App Service `site_config` — azurerm 4.x has a known bug where it reports `"block count changed from 0 to 1"` between plan and apply. Configure CORS post-deploy with `az webapp cors add` instead (Step 4 below).
+
 ### Step 2: Deploy Backend API
 
-```powershell
+```bash
 cd ../../src/LunchVoteApi
 dotnet publish -c Release -o ./publish
-Remove-Item -Recurse -Force ./publish/BuildHost-netcore -ErrorAction SilentlyContinue
-Compress-Archive -Path ./publish/* -DestinationPath ./publish.zip -Force
+rm -rf ./publish/BuildHost-netcore 2>/dev/null
+# Zip from INSIDE the publish dir so files land at the root (App Service expects this)
+(cd publish && zip -r ../publish.zip . -q)
 az webapp deploy --resource-group <RG> --name <API_APP_NAME> --src-path ./publish.zip --type zip
-Remove-Item ./publish -Recurse -Force; Remove-Item ./publish.zip
+rm -rf publish publish.zip
 ```
+
+> ⚠️ **Zip the contents, not the folder.** If you `zip -r publish.zip publish/`, App Service ends up with `/home/site/wwwroot/publish/LunchVoteApi.dll` and the container can't find the entry point. Use `(cd publish && zip ../publish.zip .)` so the DLL is at `wwwroot` root.
 
 > ⚠️ If the API targets .NET 10 but Terraform set .NET 8: `az webapp config set --resource-group <RG> --name <API_APP_NAME> --linux-fx-version "DOTNETCORE|10.0"`
 
 ### Step 3: Deploy Frontend SPA
 
-```powershell
+For a Vite static SPA on Linux App Service, the most reliable pattern is **`pm2 serve` the `dist/` contents** — no custom Node server, no `node_modules` upload.
+
+```bash
 cd ../lunch-vote-spa
+
+# Bake the production API URL into the build
+echo "VITE_API_URL=https://<API_APP_NAME>.azurewebsites.net/api" > .env.production
 npm install && npm run build
-Compress-Archive -Path ./dist/* -DestinationPath ./dist.zip -Force
+
+# Configure App Service: no remote build, pm2 serves static files with SPA fallback
+az webapp config appsettings set --resource-group <RG> --name <SPA_APP_NAME> \
+  --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false
+az webapp config set --resource-group <RG> --name <SPA_APP_NAME> \
+  --startup-file "pm2 serve /home/site/wwwroot --no-daemon --spa"
+
+# Zip ONLY the contents of dist/
+(cd dist && zip -r ../dist.zip . -q)
 az webapp deploy --resource-group <RG> --name <SPA_APP_NAME> --src-path ./dist.zip --type zip
-Remove-Item ./dist.zip
+rm dist.zip
 ```
+
+> ⚠️ **Don't ship `node_modules` or a custom Express server.** Cross-compiled node_modules from Codespaces fail to start on App Service Linux containers (container exits with code 1, infinite restart loop). The `pm2 serve … --spa` startup command handles client-side routing out of the box.
 
 ### Step 4: Update CORS
 
@@ -232,22 +254,27 @@ az webapp config connection-string list --resource-group <RG> --name <API_APP_NA
 
 **2. Create the SQL user for the App Service's Managed Identity:**
 
-```powershell
-# Get your access token
-$TOKEN = az account get-access-token --resource https://database.windows.net --query accessToken -o tsv
+The Codespace doesn't ship with `sqlcmd`. Quickest path is `go-sqlcmd` (single binary, supports `--authentication-method ActiveDirectoryAzCli`):
+
+```bash
+curl -sL https://github.com/microsoft/go-sqlcmd/releases/download/v1.8.0/sqlcmd-linux-amd64.tar.bz2 \
+  | tar -xjC /tmp && sudo mv /tmp/sqlcmd /usr/local/bin/
+
+sqlcmd -S <server>.database.windows.net -d <db> \
+  --authentication-method ActiveDirectoryAzCli \
+  -Q "CREATE USER [<api-app-service-name>] FROM EXTERNAL PROVIDER;
+      ALTER ROLE db_datareader ADD MEMBER [<api-app-service-name>];
+      ALTER ROLE db_datawriter ADD MEMBER [<api-app-service-name>];
+      ALTER ROLE db_ddladmin   ADD MEMBER [<api-app-service-name>];"
 ```
 
-Connect to the database (SSMS, Azure Data Studio, or sqlcmd) and run:
+> ⚠️ **Use the App Service NAME, not the MI object ID.** `CREATE USER [<guid>] FROM EXTERNAL PROVIDER` fails in many tenants with *"Principal could not be found or this principal type is not supported."* The app-service display name works.
 
-```sql
-CREATE USER [<api-app-service-name>] FROM EXTERNAL PROVIDER;
-ALTER ROLE db_datareader ADD MEMBER [<api-app-service-name>];
-ALTER ROLE db_datawriter ADD MEMBER [<api-app-service-name>];
-```
+> ⚠️ **`db_ddladmin` is required** because the API calls `EnsureCreated()` at startup to create the `Polls`/`Options`/`Votes` tables. Without DDL rights you'll see `CREATE TABLE permission denied` in the logs and every endpoint returns 500. Alternative: pre-create the tables yourself and grant only reader/writer.
 
 **3. Verify persistence:** Restart the App Service, create a poll, restart again, confirm data survives.
 
-```powershell
+```bash
 az webapp restart --resource-group <RG> --name <API_APP_NAME>
 ```
 
@@ -283,7 +310,7 @@ az webapp config appsettings set --resource-group <RG> --name <API_APP_NAME> `
 | 1 | SQL Server visible in Portal with Entra ID admin configured |
 | 2 | Firewall rule allows Azure services (`0.0.0.0`) |
 | 3 | `DefaultConnection` set with `Active Directory Default` |
-| 4 | SQL user created for App Service Managed Identity with `db_datareader` + `db_datawriter` |
+| 4 | SQL user created for App Service Managed Identity with `db_datareader` + `db_datawriter` + `db_ddladmin` (needed for EF `EnsureCreated`) |
 | 5 | Data persists across App Service restarts |
 | 6 | Connection string stored in Key Vault |
 | 7 | App Service has "Key Vault Secrets User" RBAC role (via Terraform) |
@@ -430,9 +457,43 @@ Remove-Item -Recurse -Force ./publish/BuildHost-netcore -ErrorAction SilentlyCon
 <details>
 <summary><strong>API Returns 500 After Deploy</strong></summary>
 
-SQL Managed Identity user likely not created yet. Quick fix — remove the connection string to use in-memory DB:
-```powershell
+SQL Managed Identity user likely not created yet, OR the MI lacks `db_ddladmin` so `EnsureCreated()` can't build the schema. Check logs:
+
+```bash
+az webapp log download --resource-group <RG> --name <API_APP_NAME> --log-file api-logs.zip
+unzip -p api-logs.zip LogFiles/*default_docker.log | grep -iE "denied|exception" | tail
+```
+
+Quick fix — remove the connection string to use in-memory DB:
+```bash
 az webapp config connection-string delete --resource-group <RG> --name <API_APP_NAME> --setting-names DefaultConnection
+az webapp restart --resource-group <RG> --name <API_APP_NAME>
+```
+</details>
+
+<details>
+<summary><strong>SPA shows ":( Application Error" or stuck on container startup</strong></summary>
+
+Almost always caused by deploying a custom Node server with `node_modules` from Codespaces. The native module ABI doesn't match the App Service Linux container.
+
+Fix: use the `pm2 serve … --spa` pattern from Sprint 2 — ship only the contents of `dist/`.
+</details>
+
+<details>
+<summary><strong>Key Vault secret set returns Forbidden even after granting RBAC</strong></summary>
+
+RBAC role assignments on Key Vault can take 5–10 minutes to propagate. Workarounds:
+- Wait and retry, or
+- Set the connection string directly on the App Service (`az webapp config connection-string set …`) and skip Key Vault for the hackathon timebox.
+</details>
+
+<details>
+<summary><strong>API container fails to start: "DiagnosticServer cannot be mounted at /diagServer"</strong></summary>
+
+Disable the diagnostic logging volume:
+```bash
+az webapp log config --resource-group <RG> --name <API_APP_NAME> \
+  --docker-container-logging filesystem --detailed-error-messages false --failed-request-tracing false
 az webapp restart --resource-group <RG> --name <API_APP_NAME>
 ```
 </details>
