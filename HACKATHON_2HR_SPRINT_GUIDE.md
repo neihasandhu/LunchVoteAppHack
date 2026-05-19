@@ -37,26 +37,29 @@ This is a condensed version of the [full-day hackathon](HACKATHON_PARTICIPANT_GU
 
 ## 🛠️ Prerequisites (Verify Before Starting)
 
-All tools must be installed **before** the hackathon begins. Run these checks:
+We are using **GitHub Codespaces** to ensure everyone has a consistent, ready-to-go environment. A tailored `devcontainer.json` is already provided which includes all the prerequisite tools (Node 20, .NET 8, Terraform, Azure CLI) pre-installed!
 
-```powershell
-dotnet --version          # Expect 10.x
-node --version            # Expect 20.x+
-terraform -version        # Expect v1.11.4+
-az version                # Azure CLI installed
-az login                  # Authenticated
-git --version             # Git installed
-```
+1. **Launch your Codespace:**
+   - Navigate to the repository on GitHub.
+   - Click the green **Code** button.
+   - Select the **Codespaces** tab.
+   - Click **Create codespace on main**.
 
-Clone the repo, verify the API works, and explore Swagger:
+2. **Authenticate to Azure (using your provided Hackathon Account):**
+   You have been provided a `copilotuser` account configured with a Temporary Access Pass (TAP). Use this to log in to Azure:
 
-```powershell
-git clone <REPO_URL>
-cd LunchVoteApp/src/LunchVoteApi
-dotnet run
-# Visit https://localhost:52544/swagger
-# Test: curl -k https://localhost:52544/api/groups
-```
+   ```bash
+   az login --use-device-code  # Follow prompts using your copilotuser account + TAP
+   ```
+
+3. **Verify the API works locally:**
+   ```bash
+   cd src/LunchVoteApi
+   dotnet run
+   # The port will be forwarded securely by Codespaces.
+   # Visit the forwarded URL and append /swagger to explore the API.
+   # Test: curl -k https://localhost:52544/api/groups
+   ```
 
 ---
 
