@@ -65,3 +65,9 @@ infra/bicep/**/*.parameters.*.json
 
 # VS Code
 .vscode/
+
+# Temporary build artifacts
+*.zip
+api-publish*/
+*.ps1
+*.sql
