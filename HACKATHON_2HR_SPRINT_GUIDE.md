@@ -99,7 +99,12 @@ We are using **GitHub Codespaces** to ensure everyone has a consistent, ready-to
 
 > **Goal:** Author Terraform code with Copilot to provision all Azure resources.
 
-⚠️ **Delete or rename `infra/terraform/`** so Copilot doesn't just copy the reference implementation. Write your own in `infra/my-terraform/`.
+Choose one of these starting paths before you begin:
+
+- **From scratch:** rename `infra/terraform/` out of the way and author your own configuration in `infra/my-terraform/`.
+- **From templates:** keep `infra/terraform/` in place and use it as your starting point. You can deploy it directly or copy it to `infra/my-terraform/` and customize it.
+
+Both paths use the same acceptance criteria below.
 
 ### Structure
 
@@ -115,6 +120,8 @@ infra/my-terraform/
     ├── key-vault/            # Key Vault
     └── key-vault-access/     # RBAC role assignment
 ```
+
+If you choose the template path, the equivalent structure already exists in `infra/terraform/`.
 
 ### Acceptance Criteria
 
@@ -157,12 +164,14 @@ $OBJECT_ID = az ad signed-in-user show --query id -o tsv
 $EMAIL = az ad signed-in-user show --query userPrincipalName -o tsv
 
 # Provision
-cd infra/my-terraform
+cd <YOUR_TERRAFORM_DIR>
 terraform init
 terraform plan -out tfplan -var="sql_admin_object_id=$OBJECT_ID" -var="sql_admin_login=$EMAIL"
 terraform apply tfplan
 terraform output
 ```
+
+Use `infra/my-terraform` for the scratch path, or `infra/terraform` if you are using the provided templates directly.
 
 ### Step 2: Deploy Backend API
 

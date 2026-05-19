@@ -12,7 +12,10 @@
 
 This repository contains a **complete Terraform configuration** in `infra/terraform/` that was used to provision the reference environment. If this folder remains in your workspace, GitHub Copilot will use it as context and may simply reproduce the existing code rather than helping you learn to write your own.
 
-**To ensure a genuine learning experience, delete or move this folder outside the workspace before starting:**
+Choose one of these paths before you start:
+
+- **Write Terraform from scratch:** move `infra/terraform/` outside the workspace and build your own configuration in `infra/my-terraform/`.
+- **Use the provided templates:** keep `infra/terraform/` in the workspace and treat it as your baseline. You can deploy it directly or copy it into `infra/my-terraform/` before modifying it.
 
 
 ---
@@ -53,9 +56,11 @@ A cloud service for securely storing secrets, keys, and certificates. Your app w
 
 ### Your Mission
 
-Using GitHub Copilot in VS Code, author your own Terraform configuration from scratch to provision the Lunch Vote App's Azure infrastructure.
+Using GitHub Copilot in VS Code, provision the Lunch Vote App's Azure infrastructure by either authoring Terraform from scratch or adapting the provided templates.
 
-> ⚠️ **Important:** You must write your own Terraform code with the assistance of GitHub Copilot. Do NOT copy from any existing templates. Ask Copilot questions, iterate on the generated code, and learn how each resource works.
+> ⚠️ **Important:** Choose one learning path and stay intentional about it.
+> - If you pick the scratch path, write your own Terraform with GitHub Copilot and keep the reference templates out of the workspace.
+> - If you pick the template path, use `infra/terraform/` as a starting point and focus on understanding, validating, and customizing the modules rather than copying blindly.
 
 ### Terraform Structure to Create
 
@@ -72,6 +77,8 @@ infra/
         ├── key-vault/       # Azure Key Vault
         └── key-vault-access/  # RBAC role assignment for Key Vault
 ```
+
+If you choose the template path, this structure already exists under `infra/terraform/`.
 
 ### Acceptance Criteria
 
