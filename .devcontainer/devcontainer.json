@@ -37,6 +37,6 @@
       "label": "API Backend"
     }
   },
-  "postCreateCommand": "dotnet restore src/LunchVoteApi/LunchVoteApi.csproj && npm ci --prefix src/lunch-vote-spa",
+  "postCreateCommand": "dotnet restore src/LunchVoteApi/LunchVoteApi.csproj && dotnet restore tests/LunchVoteApi.Tests/LunchVoteApi.Tests.csproj && npm ci --prefix src/lunch-vote-spa",
   "remoteUser": "vscode"
 }
